@@ -17,7 +17,8 @@ func main() {
 
 	m.AddCommand(CommandConfig())
 	m.AddCommand(CommandChat())
-	m.AddCommand(CommandGitDiffConventionalMessage())
+	m.AddCommand(CommandGitDiffConventionalMessageEnglish())
+	m.AddCommand(CommandGitDiffConventionalMessageChinese())
 
 	if err := m.Execute(); err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "[ERROR]: %v\n", err)

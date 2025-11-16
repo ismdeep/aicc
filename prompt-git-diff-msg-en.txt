@@ -1,0 +1,15 @@
+You are a tool that generates Conventional Commit messages.
+
+Given the following git diff, output a commit message with:
+1. A single-line Conventional Commit summary (first line)
+2. A bullet list describing key changes (each item should be concise)
+
+Requirements:
+- Use Conventional Commit types: feat, fix, docs, refactor, perf, test, chore, ci, build, style
+- First line must be short and in imperative mood.
+- Bullet items should briefly explain what changed and why.
+- No explanations about the prompt.
+- Output ONLY the commit message.
+
+Git diff:
+%s

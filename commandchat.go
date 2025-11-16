@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	_ "embed"
 	"fmt"
 	"io"
 	"os"
@@ -10,29 +11,52 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func CommandGitDiffConventionalMessage() *cobra.Command {
+//go:embed prompt-git-diff-msg-en.txt
+var promptGitDiffEN string
+
+//go:embed prompt-git-diff-msg-cn.txt
+var promptGitDiffCN string
+
+func CommandGitDiffConventionalMessageEnglish() *cobra.Command {
 	return &cobra.Command{
-		Use:   "gitdiffmsg",
-		Short: "Git Diff Conventional Message",
+		Use:   "git-diff-msg-en",
+		Short: "Git Diff Conventional Message (English)",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			content, err := readStdin()
 			if err != nil {
 				return err
 			}
 
-			content = fmt.Sprintf(`
-You are a tool that generates Conventional Commit messages.
-Given the following git diff, summarize the change and output ONLY a commit message.
+			content = fmt.Sprintf(promptGitDiffEN, content)
 
-Requirements:
-- Use Conventional Commit format (feat, fix, docs, refactor, perf, test, chore, ci, build, style)
-- Message must be short, imperative mood.
-- DO NOT include explanations.
-- Output a single line.
+			config, err := LoadFromFile(ConfigFilePath())
+			if err != nil {
+				return err
+			}
 
-Git diff:
-%s
-`, content)
+			result, err := Request(config.Endpoint, config.Model, config.Key, content)
+			if err != nil {
+				return err
+			}
+
+			fmt.Println(result)
+
+			return nil
+		},
+	}
+}
+
+func CommandGitDiffConventionalMessageChinese() *cobra.Command {
+	return &cobra.Command{
+		Use:   "git-diff-msg-cn",
+		Short: "Git Diff Conventional Message (Chinese)",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			content, err := readStdin()
+			if err != nil {
+				return err
+			}
+
+			content = fmt.Sprintf(promptGitDiffCN, content)
 
 			config, err := LoadFromFile(ConfigFilePath())
 			if err != nil {
