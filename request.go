@@ -18,6 +18,14 @@ type RequestData struct {
 	Messages []Message `json:"messages"`
 }
 
+type ResponseData struct {
+	Choices []struct {
+		Message struct {
+			Content string `json:"content"`
+		} `json:"message"`
+	} `json:"choices"`
+}
+
 func Request(endpoint string, model string, key string, input string) (string, error) {
 	requestURL := fmt.Sprintf("%v/api/v1/chat/completions", endpoint)
 
@@ -54,4 +62,22 @@ func Request(endpoint string, model string, key string, input string) (string, e
 	}
 
 	return string(raw), nil
+}
+
+func RequestContent(endpoint string, model string, key string, input string) (string, error) {
+	raw, err := Request(endpoint, model, key, input)
+	if err != nil {
+		return "", err
+	}
+
+	var responseData ResponseData
+	if err := json.Unmarshal([]byte(raw), &responseData); err != nil {
+		return "", err
+	}
+
+	if len(responseData.Choices) == 0 {
+		return "", fmt.Errorf("no choices in the response")
+	}
+
+	return responseData.Choices[0].Message.Content, nil
 }

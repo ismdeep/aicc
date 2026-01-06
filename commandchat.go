@@ -7,80 +7,20 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
 )
 
-//go:embed prompt-git-diff-msg-en.txt
-var promptGitDiffEN string
-
-//go:embed prompt-git-diff-msg-cn.txt
-var promptGitDiffCN string
-
-func CommandGitDiffConventionalMessageEnglish() *cobra.Command {
-	return &cobra.Command{
-		Use:   "git-diff-msg-en",
-		Short: "Git Diff Conventional Message (English)",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			content, err := readStdin()
-			if err != nil {
-				return err
-			}
-
-			content = fmt.Sprintf(promptGitDiffEN, content)
-
-			config, err := LoadFromFile(ConfigFilePath())
-			if err != nil {
-				return err
-			}
-
-			result, err := Request(config.Endpoint, config.Model, config.Key, content)
-			if err != nil {
-				return err
-			}
-
-			fmt.Println(result)
-
-			return nil
-		},
-	}
-}
-
-func CommandGitDiffConventionalMessageChinese() *cobra.Command {
-	return &cobra.Command{
-		Use:   "git-diff-msg-cn",
-		Short: "Git Diff Conventional Message (Chinese)",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			content, err := readStdin()
-			if err != nil {
-				return err
-			}
-
-			content = fmt.Sprintf(promptGitDiffCN, content)
-
-			config, err := LoadFromFile(ConfigFilePath())
-			if err != nil {
-				return err
-			}
-
-			result, err := Request(config.Endpoint, config.Model, config.Key, content)
-			if err != nil {
-				return err
-			}
-
-			fmt.Println(result)
-
-			return nil
-		},
-	}
-}
-
 func CommandChat() *cobra.Command {
-	return &cobra.Command{
+	var prompt string
+
+	m := &cobra.Command{
 		Use:   "chat",
 		Short: "Chat",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			content, err := readStdin()
+			content, err := prepareContent(prompt)
 			if err != nil {
 				return err
 			}
@@ -90,7 +30,7 @@ func CommandChat() *cobra.Command {
 				return err
 			}
 
-			result, err := Request(config.Endpoint, config.Model, config.Key, content)
+			result, err := RequestContent(config.Endpoint, config.Model, config.Key, content)
 			if err != nil {
 				return err
 			}
@@ -100,6 +40,42 @@ func CommandChat() *cobra.Command {
 			return nil
 		},
 	}
+
+	m.PersistentFlags().StringVarP(&prompt, "prompt", "p", "", "prompt")
+
+	return m
+}
+
+func prepareContent(prompt string) (string, error) {
+	var promptContent string
+	readFromStdin := true
+
+	if prompt != "" {
+		promptContentRaw, err := os.ReadFile(filepath.Join(os.Getenv("HOME"), ".aicc", "prompt", fmt.Sprintf("%s.txt", prompt)))
+		if err != nil {
+			return "", fmt.Errorf("failed to read prompt file: %w", err)
+		}
+		promptContent = string(promptContentRaw)
+
+		prePromptShellPath := filepath.Join(os.Getenv("HOME"), ".aicc", "prompt", fmt.Sprintf("%s.sh", prompt))
+		stat, err := os.Stat(prePromptShellPath)
+		if err == nil && stat.Mode().IsRegular() {
+			preCmd := exec.Command("bash", prePromptShellPath)
+			output, _ := preCmd.CombinedOutput()
+			promptContent += string(output)
+			readFromStdin = false
+		}
+	}
+
+	if readFromStdin {
+		stdinContent, err := readStdin()
+		if err != nil {
+			return "", err
+		}
+		return promptContent + stdinContent, nil
+	}
+
+	return promptContent, nil
 }
 
 func readStdin() (string, error) {
