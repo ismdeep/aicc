@@ -27,7 +27,7 @@ type ResponseData struct {
 }
 
 func Request(endpoint string, model string, key string, input string) (string, error) {
-	requestURL := fmt.Sprintf("%v/api/v1/chat/completions", endpoint)
+	requestURL := fmt.Sprintf("%v/chat/completions", endpoint)
 
 	requestData := RequestData{
 		Model: model,
@@ -41,7 +41,7 @@ func Request(endpoint string, model string, key string, input string) (string, e
 
 	requestDataRaw, err := json.Marshal(requestData)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed json.Marshal, err: %w", err)
 	}
 
 	req, err := http.NewRequest(http.MethodPost, requestURL, bytes.NewBuffer(requestDataRaw))
@@ -72,11 +72,11 @@ func RequestContent(endpoint string, model string, key string, input string) (st
 
 	var responseData ResponseData
 	if err := json.Unmarshal([]byte(raw), &responseData); err != nil {
-		return "", err
+		return "", fmt.Errorf("failed json.Unmarshal, content: %v, err: %w", raw, err)
 	}
 
 	if len(responseData.Choices) == 0 {
-		return "", fmt.Errorf("no choices in the response")
+		return "", fmt.Errorf("no choices in the response, content: %v", raw)
 	}
 
 	return responseData.Choices[0].Message.Content, nil
