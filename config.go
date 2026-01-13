@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 type Config struct {
@@ -19,10 +20,17 @@ func (receiver *Config) String() string {
 }
 
 func (receiver *Config) GetPromptDir() string {
-	if receiver.PromptDir != "" {
-		return receiver.PromptDir
+	promptDir := receiver.PromptDir
+	if promptDir == "" {
+		promptDir = filepath.Join(os.Getenv("HOME"), ".aicc", "prompt")
 	}
-	return filepath.Join(os.Getenv("HOME"), ".aicc", "prompt")
+
+	// render ${HOME}
+	if strings.Contains(promptDir, "${HOME}") {
+		promptDir = strings.ReplaceAll(promptDir, "${HOME}", os.Getenv("HOME"))
+	}
+
+	return promptDir
 }
 
 func Load(content string) (*Config, error) {
