@@ -38,19 +38,34 @@ func CommandConfigSet() *cobra.Command {
 	var endpoint string
 	var model string
 	var key string
+	var promptDir string
 
 	m := &cobra.Command{
 		Use:   "set",
 		Short: "Set configuration commands",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			configFile := ConfigFilePath()
 
-			config := Config{
-				Endpoint: endpoint,
-				Model:    model,
-				Key:      key,
+			config, _ := LoadFromFile(configFile)
+			if config == nil {
+				config = &Config{}
 			}
 
-			configFile := ConfigFilePath()
+			if endpoint != "" {
+				config.Endpoint = endpoint
+			}
+
+			if model != "" {
+				config.Model = model
+			}
+
+			if key != "" {
+				config.Key = key
+			}
+
+			if promptDir != "" {
+				config.PromptDir = promptDir
+			}
 
 			if err := os.WriteFile(configFile, []byte(config.String()), 0644); err != nil {
 				return err
@@ -63,10 +78,7 @@ func CommandConfigSet() *cobra.Command {
 	m.PersistentFlags().StringVar(&endpoint, "endpoint", "", "Endpoint")
 	m.PersistentFlags().StringVar(&model, "model", "", "Model")
 	m.PersistentFlags().StringVar(&key, "key", "", "Key")
-
-	_ = m.MarkPersistentFlagRequired("endpoint")
-	_ = m.MarkPersistentFlagRequired("model")
-	_ = m.MarkPersistentFlagRequired("key")
+	m.PersistentFlags().StringVar(&promptDir, "prompt-dir", "", "Prompt directory")
 
 	return m
 }

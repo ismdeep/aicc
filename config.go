@@ -3,17 +3,26 @@ package main
 import (
 	"encoding/json"
 	"os"
+	"path/filepath"
 )
 
 type Config struct {
-	Endpoint string `json:"endpoint"`
-	Model    string `json:"model"`
-	Key      string `json:"key"`
+	Endpoint  string `json:"endpoint"`
+	Model     string `json:"model"`
+	Key       string `json:"key"`
+	PromptDir string `json:"prompt_dir"`
 }
 
 func (receiver *Config) String() string {
-	raw, _ := json.Marshal(receiver)
+	raw, _ := json.MarshalIndent(receiver, "", "  ")
 	return string(raw)
+}
+
+func (receiver *Config) GetPromptDir() string {
+	if receiver.PromptDir != "" {
+		return receiver.PromptDir
+	}
+	return filepath.Join(os.Getenv("HOME"), ".aicc", "prompt")
 }
 
 func Load(content string) (*Config, error) {

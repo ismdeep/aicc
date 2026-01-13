@@ -20,12 +20,12 @@ func CommandChat() *cobra.Command {
 		Use:   "chat",
 		Short: "Chat",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			content, err := prepareContent(prompt)
+			config, err := LoadFromFile(ConfigFilePath())
 			if err != nil {
 				return err
 			}
 
-			config, err := LoadFromFile(ConfigFilePath())
+			content, err := prepareContent(config.GetPromptDir(), prompt)
 			if err != nil {
 				return err
 			}
@@ -35,8 +35,8 @@ func CommandChat() *cobra.Command {
 				return err
 			}
 
-			writeShell := filepath.Join(os.Getenv("HOME"), ".aicc", "prompt",
-				fmt.Sprintf("%s.write.sh", prompt))
+			writeShell := filepath.Join(config.GetPromptDir(), prompt, "write.sh")
+
 			stat, err := os.Stat(writeShell)
 			if err == nil && stat.Mode().IsRegular() {
 				writeCmd := exec.Command("bash", writeShell)
@@ -57,20 +57,21 @@ func CommandChat() *cobra.Command {
 	return m
 }
 
-func prepareContent(prompt string) (string, error) {
+func prepareContent(promptDir string, prompt string) (string, error) {
 	var promptContent string
 	readFromStdin := true
 
 	if prompt != "" {
-		promptContentRaw, err := os.ReadFile(filepath.Join(os.Getenv("HOME"), ".aicc", "prompt",
-			fmt.Sprintf("%s.txt", prompt)))
+		promptContentRaw, err := os.ReadFile(
+			filepath.Join(
+				promptDir, prompt, "prompt.txt"))
 		if err != nil {
 			return "", fmt.Errorf("failed to read prompt file: %w", err)
 		}
 		promptContent = string(promptContentRaw)
 
-		prePromptShellPath := filepath.Join(os.Getenv("HOME"), ".aicc", "prompt",
-			fmt.Sprintf("%s.read.sh", prompt))
+		prePromptShellPath := filepath.Join(
+			promptDir, prompt, "read.sh")
 		stat, err := os.Stat(prePromptShellPath)
 		if err == nil && stat.Mode().IsRegular() {
 			preCmd := exec.Command("bash", prePromptShellPath)
