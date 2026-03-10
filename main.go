@@ -17,6 +17,7 @@ func main() {
 
 	m.AddCommand(CommandConfig())
 	m.AddCommand(CommandChat())
+	m.AddCommand(CommandTest())
 
 	if err := m.Execute(); err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "[ERROR]: %v\n", err)
