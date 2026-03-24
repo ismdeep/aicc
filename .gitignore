@@ -3,3 +3,9 @@
 
 # macOS
 .DS_Store
+
+# build
+/build/
+
+# vendor
+/vendor/
