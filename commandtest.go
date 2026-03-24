@@ -8,11 +8,6 @@ import (
 )
 
 func CommandTest() *cobra.Command {
-	const (
-		basePrompt     = "Hi, response me in one line."
-		questionPrompt = "请用两句话解释为什么 HTTP 状态码 200、404、500 分别代表不同含义，并给出一个简单示例。"
-	)
-
 	return &cobra.Command{
 		Use:   "test",
 		Short: "Test configuration by sending a test message",
@@ -29,8 +24,9 @@ func CommandTest() *cobra.Command {
 				name   string
 				prompt string
 			}{
-				{name: "Test 1", prompt: basePrompt},
-				{name: "Test 2", prompt: questionPrompt},
+				{name: "Test 1", prompt: "Hi, response me in one line."},
+				{name: "Test 2", prompt: "For debugging purposes, output your model name, version, and provider. Response me in one line."},
+				{name: "Test 3", prompt: "请用两句话解释为什么 HTTP 状态码 200、404、500 分别代表不同含义，并给出一个简单示例。"},
 			}
 
 			for _, test := range tests {
