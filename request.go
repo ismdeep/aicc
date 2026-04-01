@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 )
 
 type Message struct {
@@ -26,8 +27,49 @@ type ResponseData struct {
 	} `json:"choices"`
 }
 
+type ModelData struct {
+	Created int64  `json:"created"`
+	ID      string `json:"id"`
+	Object  string `json:"object"`
+	OwnedBy string `json:"owned by"`
+}
+
+type ModelsResponseData struct {
+	Data []ModelData `json:"data"`
+}
+
+func joinURL(endpoint string, path string) string {
+	return strings.TrimRight(endpoint, "/") + path
+}
+
+func doRequest(method string, requestURL string, key string, body io.Reader) (string, error) {
+	req, err := http.NewRequest(method, requestURL, body)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Add("Content-Type", "application/json")
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %v", key))
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	raw, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		return "", fmt.Errorf("unexpected status code %d, content: %s", resp.StatusCode, string(raw))
+	}
+
+	return string(raw), nil
+}
+
 func Request(endpoint string, model string, key string, input string) (string, error) {
-	requestURL := fmt.Sprintf("%v/chat/completions", endpoint)
+	requestURL := joinURL(endpoint, "/chat/completions")
 
 	requestData := RequestData{
 		Model: model,
@@ -44,24 +86,23 @@ func Request(endpoint string, model string, key string, input string) (string, e
 		return "", fmt.Errorf("failed json.Marshal, err: %w", err)
 	}
 
-	req, err := http.NewRequest(http.MethodPost, requestURL, bytes.NewBuffer(requestDataRaw))
-	if err != nil {
-		return "", err
-	}
-	req.Header.Add("Content-Type", "application/json")
-	req.Header.Add("Authorization", fmt.Sprintf("Bearer %v", key))
+	return doRequest(http.MethodPost, requestURL, key, bytes.NewBuffer(requestDataRaw))
+}
 
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return "", err
-	}
+func RequestModels(endpoint string, key string) ([]ModelData, error) {
+	requestURL := joinURL(endpoint, "/models")
 
-	raw, err := io.ReadAll(resp.Body)
+	raw, err := doRequest(http.MethodGet, requestURL, key, nil)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	return string(raw), nil
+	var responseData ModelsResponseData
+	if err := json.Unmarshal([]byte(raw), &responseData); err != nil {
+		return nil, fmt.Errorf("failed json.Unmarshal, content: %v, err: %w", raw, err)
+	}
+
+	return responseData.Data, nil
 }
 
 func RequestContent(endpoint string, model string, key string, input string) (string, error) {
