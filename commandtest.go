@@ -25,9 +25,9 @@ func CommandTest() *cobra.Command {
 }
 
 func runConfigTests(w io.Writer, config *Config, requestContent func(endpoint string, model string, key string, input string) (string, error)) error {
-	fmt.Fprintln(w, "Testing configuration...")
-	fmt.Fprintf(w, "Endpoint: %s\n", config.Endpoint)
-	fmt.Fprintf(w, "Model: %s\n", config.Model)
+	_, _ = fmt.Fprintln(w, "Testing configuration...")
+	_, _ = fmt.Fprintf(w, "Endpoint: %s\n", config.Endpoint)
+	_, _ = fmt.Fprintf(w, "Model: %s\n", config.Model)
 
 	totalStart := time.Now()
 
@@ -41,7 +41,7 @@ func runConfigTests(w io.Writer, config *Config, requestContent func(endpoint st
 	}
 
 	for _, test := range tests {
-		fmt.Fprintf(w, "%s Prompt: %s\n", test.name, test.prompt)
+		_, _ = fmt.Fprintf(w, "%s Prompt: %s\n", test.name, test.prompt)
 
 		start := time.Now()
 		content, err := requestContent(config.Endpoint, config.Model, config.Key, test.prompt)
@@ -49,11 +49,11 @@ func runConfigTests(w io.Writer, config *Config, requestContent func(endpoint st
 			return fmt.Errorf("%s failed after %s: %w", test.name, time.Since(start).Round(time.Millisecond), err)
 		}
 
-		fmt.Fprintf(w, "%s Duration: %s\n", test.name, time.Since(start).Round(time.Millisecond))
-		fmt.Fprintf(w, "%s Response: %s\n", test.name, content)
+		_, _ = fmt.Fprintf(w, "%s Response: %s\n", test.name, content)
+		_, _ = fmt.Fprintf(w, "%s Duration: %s\n", test.name, time.Since(start).Round(time.Millisecond))
 	}
 
-	fmt.Fprintln(w, "✓ Configuration is valid")
-	fmt.Fprintf(w, "Total Duration: %s\n", time.Since(totalStart).Round(time.Millisecond))
+	_, _ = fmt.Fprintln(w, "✓ Configuration is valid")
+	_, _ = fmt.Fprintf(w, "Total Duration: %s\n", time.Since(totalStart).Round(time.Millisecond))
 	return nil
 }
