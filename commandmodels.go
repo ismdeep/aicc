@@ -4,15 +4,25 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sort"
 	"text/tabwriter"
 
 	"github.com/spf13/cobra"
 )
 
 func CommandModels() *cobra.Command {
-	return &cobra.Command{
+	var check bool
+	var availableOnly bool
+
+	cmd := &cobra.Command{
 		Use:   "models",
 		Short: "List available models",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			if availableOnly && !check {
+				return fmt.Errorf("--available-only requires --check")
+			}
+			return nil
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			config, err := LoadFromFile(ConfigFilePath())
 			if err != nil {
@@ -24,19 +34,70 @@ func CommandModels() *cobra.Command {
 				return err
 			}
 
-			return writeModelsTable(os.Stdout, models)
+			return runModelsCommand(os.Stdout, config, models, check, availableOnly, RequestContent)
 		},
 	}
+
+	cmd.Flags().BoolVar(&check, "check", false, "Check model availability with a test prompt")
+	cmd.Flags().BoolVar(&availableOnly, "available-only", false, "Only show available models when used with --check")
+	return cmd
 }
 
-func writeModelsTable(w io.Writer, models []ModelData) error {
+func runModelsCommand(w io.Writer, config *Config, models []ModelData, check bool, availableOnly bool, requestContent func(endpoint string, model string, key string, input string) (string, error)) error {
+	models = append([]ModelData(nil), models...)
+	sort.Slice(models, func(i int, j int) bool {
+		return models[i].ID < models[j].ID
+	})
+
+	statuses := map[string]string{}
+	if check {
+		for _, model := range models {
+			statuses[model.ID] = "Available"
+			if _, err := requestContent(config.Endpoint, model.ID, config.Key, "Hi."); err != nil {
+				statuses[model.ID] = "Unavailable"
+			}
+		}
+	}
+
+	if availableOnly {
+		availableModels := make([]ModelData, 0, len(models))
+		for _, model := range models {
+			if statuses[model.ID] == "Available" {
+				availableModels = append(availableModels, model)
+			}
+		}
+		models = availableModels
+	}
+
+	return writeModelsTable(w, models, statuses)
+}
+
+func writeModelsTable(w io.Writer, models []ModelData, statuses map[string]string) error {
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-	if _, err := fmt.Fprintln(tw, "MODEL\tBY"); err != nil {
-		return err
+	if len(statuses) == 0 {
+		if _, err := fmt.Fprintln(tw, "MODEL\tBY"); err != nil {
+			return err
+		}
+	} else {
+		if _, err := fmt.Fprintln(tw, "MODEL\tBY\tSTATUS"); err != nil {
+			return err
+		}
 	}
 
 	for _, model := range models {
-		if _, err := fmt.Fprintf(tw, "%s\t%s\n", model.ID, model.OwnedBy); err != nil {
+		if len(statuses) == 0 {
+			if _, err := fmt.Fprintf(tw, "%s\t%s\n", model.ID, model.OwnedBy); err != nil {
+				return err
+			}
+			continue
+		}
+
+		status := statuses[model.ID]
+		if status == "" {
+			status = "Unavailable"
+		}
+
+		if _, err := fmt.Fprintf(tw, "%s\t%s\t%s\n", model.ID, model.OwnedBy, status); err != nil {
 			return err
 		}
 	}

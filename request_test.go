@@ -82,7 +82,7 @@ func TestWriteModelsTable(t *testing.T) {
 		{ID: "glm-5", OwnedBy: "modelverse"},
 	}
 
-	if err := writeModelsTable(&buf, models); err != nil {
+	if err := writeModelsTable(&buf, models, nil); err != nil {
 		t.Fatalf("writeModelsTable() error = %v", err)
 	}
 
