@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"strings"
+	"sync/atomic"
 	"testing"
 )
 
@@ -18,7 +19,7 @@ func TestRunModelsCommandWithoutCheck(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	err := runModelsCommand(&buf, config, models, false, false, func(endpoint string, model string, key string, input string) (string, error) {
+	err := runModelsCommand(&buf, config, models, false, false, 5, func(endpoint string, model string, key string, input string) (string, error) {
 		t.Fatalf("requestContent should not be called when check is disabled")
 		return "", nil
 	})
@@ -49,7 +50,7 @@ func TestRunModelsCommandWithCheck(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	err := runModelsCommand(&buf, config, models, true, false, func(endpoint string, model string, key string, input string) (string, error) {
+	err := runModelsCommand(&buf, config, models, true, false, 5, func(endpoint string, model string, key string, input string) (string, error) {
 		if endpoint != config.Endpoint {
 			t.Fatalf("endpoint = %s, want %s", endpoint, config.Endpoint)
 		}
@@ -94,7 +95,7 @@ func TestRunModelsCommandWithAvailableOnly(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	err := runModelsCommand(&buf, config, models, true, true, func(endpoint string, model string, key string, input string) (string, error) {
+	err := runModelsCommand(&buf, config, models, true, true, 5, func(endpoint string, model string, key string, input string) (string, error) {
 		if model == "glm-5" {
 			return "", errors.New("model unavailable")
 		}
@@ -115,7 +116,10 @@ func TestRunModelsCommandWithAvailableOnly(t *testing.T) {
 
 func TestCommandModelsAvailableOnlyRequiresCheck(t *testing.T) {
 	cmd := CommandModels()
-	cmd.SetArgs([]string{"--available-only"})
+	args := []string{"--available-only"}
+	if err := cmd.ParseFlags(args); err != nil {
+		t.Fatalf("ParseFlags() error = %v", err)
+	}
 
 	err := cmd.PreRunE(cmd, nil)
 	if err == nil {
@@ -123,5 +127,68 @@ func TestCommandModelsAvailableOnlyRequiresCheck(t *testing.T) {
 	}
 	if err.Error() != "--available-only requires --check" {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestCommandModelsConcurrencyMustBePositive(t *testing.T) {
+	cmd := CommandModels()
+	args := []string{"--concurrency", "0"}
+	if err := cmd.ParseFlags(args); err != nil {
+		t.Fatalf("ParseFlags() error = %v", err)
+	}
+
+	err := cmd.PreRunE(cmd, nil)
+	if err == nil {
+		t.Fatal("expected error when --concurrency is not positive")
+	}
+	if err.Error() != "--concurrency must be greater than 0" {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestRunModelsCommandWithConcurrentCheck(t *testing.T) {
+	config := &Config{
+		Endpoint: "https://example.com/api/v1",
+		Key:      "test-key",
+	}
+	models := []ModelData{
+		{ID: "glm-5", OwnedBy: "modelverse"},
+		{ID: "deepseek-v3.1", OwnedBy: "deepseek"},
+		{ID: "qwen3", OwnedBy: "qwen"},
+	}
+
+	var buf bytes.Buffer
+	started := make(chan struct{}, len(models))
+	release := make(chan struct{})
+	var current int32
+	var maxConcurrent int32
+
+	go func() {
+		for range len(models) {
+			<-started
+		}
+		close(release)
+	}()
+
+	err := runModelsCommand(&buf, config, models, true, false, len(models), func(endpoint string, model string, key string, input string) (string, error) {
+		running := atomic.AddInt32(&current, 1)
+		for {
+			recorded := atomic.LoadInt32(&maxConcurrent)
+			if running <= recorded || atomic.CompareAndSwapInt32(&maxConcurrent, recorded, running) {
+				break
+			}
+		}
+
+		started <- struct{}{}
+		<-release
+		atomic.AddInt32(&current, -1)
+		return "Hi.", nil
+	})
+	if err != nil {
+		t.Fatalf("runModelsCommand() error = %v", err)
+	}
+
+	if maxConcurrent < 2 {
+		t.Fatalf("maxConcurrent = %d, want at least 2", maxConcurrent)
 	}
 }
