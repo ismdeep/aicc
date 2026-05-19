@@ -11,10 +11,10 @@ help:
 # `make build`
 .PHONY: build
 build:
-	CGO_ENABLED=0 GOOS=linux  GOARCH=amd64 go build -o $(BUILD_DIR)/$(PROGRAM)_linux_amd64  -trimpath -ldflags '-s -w' .
-	CGO_ENABLED=0 GOOS=linux  GOARCH=arm64 go build -o $(BUILD_DIR)/$(PROGRAM)_linux_arm64  -trimpath -ldflags '-s -w' .
-	CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -o $(BUILD_DIR)/$(PROGRAM)_darwin_amd64 -trimpath -ldflags '-s -w' .
-	CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -o $(BUILD_DIR)/$(PROGRAM)_darwin_arm64 -trimpath -ldflags '-s -w' .
+	CGO_ENABLED=0 GOOS=linux  GOARCH=amd64 go build -o $(BUILD_DIR)/$(PROGRAM)_linux_amd64  -mod vendor -trimpath -ldflags '-s -w' .
+	CGO_ENABLED=0 GOOS=linux  GOARCH=arm64 go build -o $(BUILD_DIR)/$(PROGRAM)_linux_arm64  -mod vendor -trimpath -ldflags '-s -w' .
+	CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -o $(BUILD_DIR)/$(PROGRAM)_darwin_amd64 -mod vendor -trimpath -ldflags '-s -w' .
+	CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -o $(BUILD_DIR)/$(PROGRAM)_darwin_arm64 -mod vendor -trimpath -ldflags '-s -w' .
 
 # `make clean`
 .PHONY: clean
