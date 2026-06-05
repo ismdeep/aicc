@@ -4,14 +4,12 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"strings"
 )
 
 type Config struct {
-	Endpoint  string `json:"endpoint"`
-	Model     string `json:"model"`
-	Key       string `json:"key"`
-	PromptDir string `json:"prompt_dir"`
+	Endpoint string `json:"endpoint"`
+	Model    string `json:"model"`
+	Key      string `json:"key"`
 }
 
 func (receiver *Config) String() string {
@@ -20,17 +18,7 @@ func (receiver *Config) String() string {
 }
 
 func (receiver *Config) GetPromptDir() string {
-	promptDir := receiver.PromptDir
-	if promptDir == "" {
-		promptDir = filepath.Join(os.Getenv("HOME"), ".aicc", "prompt")
-	}
-
-	// render ${HOME}
-	if strings.Contains(promptDir, "${HOME}") {
-		promptDir = strings.ReplaceAll(promptDir, "${HOME}", os.Getenv("HOME"))
-	}
-
-	return promptDir
+	return filepath.Join(os.Getenv("HOME"), ".aicc", "prompt")
 }
 
 func Load(content string) (*Config, error) {
@@ -38,16 +26,24 @@ func Load(content string) (*Config, error) {
 	var config Config
 	err := json.Unmarshal([]byte(content), &config)
 	if err != nil {
-		return nil, err
+		return &Config{}, err
 	}
 	return &config, nil
 }
 
 func LoadFromFile(filePath string) (*Config, error) {
 	// 读取配置文件
-	content, err := os.ReadFile(filePath)
-	if err != nil {
-		return nil, err
+	content, _ := os.ReadFile(filePath)
+	c, _ := Load(string(content))
+	// 从环境变量加载
+	if os.Getenv("OPENAI_BASE_URL") != "" {
+		c.Endpoint = os.Getenv("OPENAI_BASE_URL")
 	}
-	return Load(string(content))
+	if os.Getenv("OPENAI_API_KEY") != "" {
+		c.Key = os.Getenv("OPENAI_API_KEY")
+	}
+	if os.Getenv("OPENAI_MODEL") != "" {
+		c.Model = os.Getenv("OPENAI_MODEL")
+	}
+	return c, nil
 }

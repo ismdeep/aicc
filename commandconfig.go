@@ -14,7 +14,7 @@ func ConfigFilePath() string {
 		panic(err)
 	}
 
-	return filepath.Join(homeDir, ".aicc.json")
+	return filepath.Join(homeDir, ".aicc", "config.json")
 }
 
 func CommandConfigShow() *cobra.Command {
@@ -38,7 +38,6 @@ func CommandConfigSet() *cobra.Command {
 	var endpoint string
 	var model string
 	var key string
-	var promptDir string
 
 	m := &cobra.Command{
 		Use:   "set",
@@ -63,10 +62,6 @@ func CommandConfigSet() *cobra.Command {
 				config.Key = key
 			}
 
-			if promptDir != "" {
-				config.PromptDir = promptDir
-			}
-
 			if err := os.WriteFile(configFile, []byte(config.String()), 0644); err != nil {
 				return err
 			}
@@ -78,7 +73,6 @@ func CommandConfigSet() *cobra.Command {
 	m.PersistentFlags().StringVar(&endpoint, "endpoint", "", "Endpoint")
 	m.PersistentFlags().StringVar(&model, "model", "", "Model")
 	m.PersistentFlags().StringVar(&key, "key", "", "Key")
-	m.PersistentFlags().StringVar(&promptDir, "prompt-dir", "", "Prompt directory")
 
 	return m
 }

@@ -9,8 +9,16 @@ import (
 
 func main() {
 	m := &cobra.Command{
-		Use:           "aicc",
-		Short:         "aicc",
+		Use:   "aicc",
+		Short: "aicc",
+		Long: `aicc
+
+Environment variables:
+  OPENAI_BASE_URL    Override the API endpoint (config: endpoint)
+  OPENAI_API_KEY     Override the API key (config: key)
+  OPENAI_MODEL       Override the model name (config: model)
+
+Environment variables take precedence over values in ~/.aicc/config.json.`,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
