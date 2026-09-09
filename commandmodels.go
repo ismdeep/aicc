@@ -6,7 +6,6 @@ import (
 	"os"
 	"sort"
 	"sync"
-	"text/tabwriter"
 
 	"github.com/spf13/cobra"
 )
@@ -55,27 +54,41 @@ func runModelsCommand(w io.Writer, config *Config, models []ModelData, check boo
 		return models[i].ID < models[j].ID
 	})
 
-	statuses := map[string]string{}
-	if check {
-		if err := checkModelStatuses(statuses, config, models, concurrency, requestContent); err != nil {
+	if !check {
+		return writeModelsTable(w, models, nil)
+	}
+
+	return writeCheckedModelsTable(w, config, models, availableOnly, concurrency, requestContent)
+}
+
+type modelCheckResult struct {
+	model  ModelData
+	status string
+}
+
+func writeCheckedModelsTable(w io.Writer, config *Config, models []ModelData, availableOnly bool, concurrency int, requestContent func(endpoint string, model string, key string, input string) (string, error)) error {
+	modelWidth, ownedByWidth := modelColumnWidths(models)
+	if err := writeCheckedModelsHeader(w, modelWidth, ownedByWidth); err != nil {
+		return err
+	}
+
+	results := make(chan modelCheckResult, len(models))
+	go checkModelStatuses(results, config, models, concurrency, requestContent)
+
+	for result := range results {
+		if availableOnly && result.status != "Available" {
+			continue
+		}
+		if err := writeCheckedModelRow(w, result.model, result.status, modelWidth, ownedByWidth); err != nil {
 			return err
 		}
 	}
-
-	if availableOnly {
-		availableModels := make([]ModelData, 0, len(models))
-		for _, model := range models {
-			if statuses[model.ID] == "Available" {
-				availableModels = append(availableModels, model)
-			}
-		}
-		models = availableModels
-	}
-
-	return writeModelsTable(w, models, statuses)
+	return nil
 }
 
-func checkModelStatuses(statuses map[string]string, config *Config, models []ModelData, concurrency int, requestContent func(endpoint string, model string, key string, input string) (string, error)) error {
+func checkModelStatuses(results chan<- modelCheckResult, config *Config, models []ModelData, concurrency int, requestContent func(endpoint string, model string, key string, input string) (string, error)) {
+	defer close(results)
+
 	if concurrency > len(models) {
 		concurrency = len(models)
 	}
@@ -85,7 +98,6 @@ func checkModelStatuses(statuses map[string]string, config *Config, models []Mod
 
 	jobs := make(chan ModelData)
 	var wg sync.WaitGroup
-	var mu sync.Mutex
 
 	worker := func() {
 		defer wg.Done()
@@ -95,9 +107,7 @@ func checkModelStatuses(statuses map[string]string, config *Config, models []Mod
 				status = "Unavailable"
 			}
 
-			mu.Lock()
-			statuses[model.ID] = status
-			mu.Unlock()
+			results <- modelCheckResult{model: model, status: status}
 		}
 	}
 
@@ -111,24 +121,23 @@ func checkModelStatuses(statuses map[string]string, config *Config, models []Mod
 	}
 	close(jobs)
 	wg.Wait()
-	return nil
 }
 
 func writeModelsTable(w io.Writer, models []ModelData, statuses map[string]string) error {
-	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
+	modelWidth, ownedByWidth := modelColumnWidths(models)
 	if len(statuses) == 0 {
-		if _, err := fmt.Fprintln(tw, "MODEL\tBY"); err != nil {
+		if _, err := fmt.Fprintf(w, "%-*s  %-*s\n", modelWidth, "MODEL", ownedByWidth, "BY"); err != nil {
 			return err
 		}
 	} else {
-		if _, err := fmt.Fprintln(tw, "MODEL\tBY\tSTATUS"); err != nil {
+		if err := writeCheckedModelsHeader(w, modelWidth, ownedByWidth); err != nil {
 			return err
 		}
 	}
 
 	for _, model := range models {
 		if len(statuses) == 0 {
-			if _, err := fmt.Fprintf(tw, "%s\t%s\n", model.ID, model.OwnedBy); err != nil {
+			if _, err := fmt.Fprintf(w, "%-*s  %-*s\n", modelWidth, model.ID, ownedByWidth, model.OwnedBy); err != nil {
 				return err
 			}
 			continue
@@ -139,10 +148,34 @@ func writeModelsTable(w io.Writer, models []ModelData, statuses map[string]strin
 			status = "Unavailable"
 		}
 
-		if _, err := fmt.Fprintf(tw, "%s\t%s\t%s\n", model.ID, model.OwnedBy, status); err != nil {
+		if err := writeCheckedModelRow(w, model, status, modelWidth, ownedByWidth); err != nil {
 			return err
 		}
 	}
 
-	return tw.Flush()
+	return nil
+}
+
+func modelColumnWidths(models []ModelData) (int, int) {
+	modelWidth := len("MODEL")
+	ownedByWidth := len("BY")
+	for _, model := range models {
+		if len(model.ID) > modelWidth {
+			modelWidth = len(model.ID)
+		}
+		if len(model.OwnedBy) > ownedByWidth {
+			ownedByWidth = len(model.OwnedBy)
+		}
+	}
+	return modelWidth, ownedByWidth
+}
+
+func writeCheckedModelsHeader(w io.Writer, modelWidth int, ownedByWidth int) error {
+	_, err := fmt.Fprintf(w, "%-*s  %-*s  %s\n", modelWidth, "MODEL", ownedByWidth, "BY", "STATUS")
+	return err
+}
+
+func writeCheckedModelRow(w io.Writer, model ModelData, status string, modelWidth int, ownedByWidth int) error {
+	_, err := fmt.Fprintf(w, "%-*s  %-*s  %s\n", modelWidth, model.ID, ownedByWidth, model.OwnedBy, status)
+	return err
 }

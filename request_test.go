@@ -95,6 +95,9 @@ func TestWriteModelsTable(t *testing.T) {
 	if !strings.Contains(lines[0], "MODEL") || !strings.Contains(lines[0], "BY") {
 		t.Fatalf("header = %q, want columns MODEL and BY", lines[0])
 	}
+	if strings.Index(lines[0], "BY") != strings.Index(lines[1], "deepseek")+len("deepseek-v3.1")+2 {
+		t.Fatalf("BY column is not aligned: header = %q, row = %q", lines[0], lines[1])
+	}
 
 	if !strings.Contains(lines[1], "deepseek-v3.1") || !strings.Contains(lines[1], "deepseek") {
 		t.Fatalf("row 1 = %q, want model data", lines[1])

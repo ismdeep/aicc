@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"errors"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 )
 
 func TestRunModelsCommandWithoutCheck(t *testing.T) {
@@ -191,4 +193,78 @@ func TestRunModelsCommandWithConcurrentCheck(t *testing.T) {
 	if maxConcurrent < 2 {
 		t.Fatalf("maxConcurrent = %d, want at least 2", maxConcurrent)
 	}
+}
+
+func TestRunModelsCommandWritesChecksAsTheyComplete(t *testing.T) {
+	config := &Config{
+		Endpoint: "https://example.com/api/v1",
+		Key:      "test-key",
+	}
+	models := []ModelData{
+		{ID: "first", OwnedBy: "test"},
+		{ID: "second", OwnedBy: "test"},
+	}
+
+	firstCheckDone := make(chan struct{})
+	releaseSecondCheck := make(chan struct{})
+	writer := &blockingWriter{
+		firstRow: make(chan struct{}),
+	}
+
+	runDone := make(chan error, 1)
+	go func() {
+		runDone <- runModelsCommand(writer, config, models, true, false, 1, func(endpoint string, model string, key string, input string) (string, error) {
+			if model == "first" {
+				close(firstCheckDone)
+				return "Hi.", nil
+			}
+			<-releaseSecondCheck
+			return "Hi.", nil
+		})
+	}()
+
+	select {
+	case <-writer.firstRow:
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for the first model row")
+	}
+
+	select {
+	case <-firstCheckDone:
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for the first model check")
+	}
+
+	close(releaseSecondCheck)
+	if err := <-runDone; err != nil {
+		t.Fatalf("runModelsCommand() error = %v", err)
+	}
+
+	output := writer.String()
+	if !strings.Contains(output, "first") || !strings.Contains(output, "second") {
+		t.Fatalf("output missing model rows: %q", output)
+	}
+}
+
+type blockingWriter struct {
+	mu       sync.Mutex
+	firstRow chan struct{}
+	rowSent  bool
+	buf      bytes.Buffer
+}
+
+func (w *blockingWriter) Write(p []byte) (int, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if !w.rowSent && bytes.Contains(p, []byte("first")) {
+		w.rowSent = true
+		close(w.firstRow)
+	}
+	return w.buf.Write(p)
+}
+
+func (w *blockingWriter) String() string {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.buf.String()
 }
