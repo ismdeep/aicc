@@ -42,10 +42,9 @@ func TestConfig_GetPromptDir(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			receiver := &Config{
-				Endpoint:  tt.fields.Endpoint,
-				Model:     tt.fields.Model,
-				Key:       tt.fields.Key,
-				PromptDir: tt.fields.PromptDir,
+				Endpoint: tt.fields.Endpoint,
+				Model:    tt.fields.Model,
+				Key:      tt.fields.Key,
 			}
 			if got := receiver.GetPromptDir(); got != tt.want {
 				t.Errorf("GetPromptDir() = %v, want %v", got, tt.want)
