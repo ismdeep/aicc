@@ -21,6 +21,8 @@ jobs:
           go-version-file: go.mod
 
       - name: Build
+        env:
+          VERSION: ${{ github.ref_name }}
         run: make build
 
       - name: Publish GitHub release

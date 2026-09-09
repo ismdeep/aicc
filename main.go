@@ -27,6 +27,7 @@ Environment variables take precedence over values in ~/.aicc/config.json.`,
 	m.AddCommand(CommandChat())
 	m.AddCommand(CommandModels())
 	m.AddCommand(CommandTest())
+	m.AddCommand(CommandVersion())
 
 	if err := m.Execute(); err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "[ERROR]: %v\n", err)
