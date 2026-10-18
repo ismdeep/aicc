@@ -1,4 +1,4 @@
-BINDIR ?= /usr/local/bin
+BINDIR ?=
 PROGRAM ?= aicc
 BUILD_DIR ?= ./build
 LOCAL_BINARY ?= $(BUILD_DIR)/$(PROGRAM)
@@ -7,6 +7,13 @@ LOCAL_BINARY ?= $(BUILD_DIR)/$(PROGRAM)
 .PHONY: help
 help:
 	@cat Makefile | grep '# `' | grep -v '@cat Makefile'
+
+.PHONY: check-env
+check-env:
+	@echo "================ check-env ================"
+	@echo "VERSION: $${VERSION:-"dev"}"
+	@echo "BINDIR: $${BINDIR:?}"
+	@echo "================ check-env ================"
 
 # `make build`
 .PHONY: build
@@ -23,7 +30,7 @@ clean:
 
 # `make install`
 .PHONY: install
-install:
+install: check-env
 	mkdir -p $(BUILD_DIR)
 	CGO_ENABLED=0 go build -o $(LOCAL_BINARY) -trimpath -ldflags "-s -w -X main.Version=$${VERSION:-"dev"}" .
 	mkdir -p $(DESTDIR)$(BINDIR)
